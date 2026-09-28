@@ -6,9 +6,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -271,7 +271,7 @@ func TestMetadataStoreHandler_Get_IncludesStatus(t *testing.T) {
 
 // --- duplicate-name tests ---
 
-func createMetadataStoreReq(t *testing.T, handler *MetadataStoreHandler, name, storeType string, config map[string]string) *httptest.ResponseRecorder {
+func createMetadataStoreReq(t *testing.T, handler *MetadataStoreHandler, name, storeType string, config map[string]any) *httptest.ResponseRecorder {
 	t.Helper()
 
 	cfgJSON, err := json.Marshal(config)
@@ -293,21 +293,20 @@ func createMetadataStoreReq(t *testing.T, handler *MetadataStoreHandler, name, s
 // A second create under a name already in use is a conflict whatever the
 // backend does with its data directory. Badger takes an exclusive lock on that
 // directory, so instantiating the store a second time fails before the name is
-// ever compared unless the name check runs first; backends holding no such
-// handle reach the duplicate-name arm on their own and must keep answering 409
-// too.
+// ever compared unless the name check runs first; an in-memory store holds no
+// such handle, reaches the duplicate-name arm on its own and must keep
+// answering 409 too.
 func TestMetadataStoreHandler_Create_DuplicateNameIsConflict(t *testing.T) {
 	tests := []struct {
 		storeType string
-		config    map[string]string
+		config    map[string]any
 	}{
-		{storeType: "badger", config: map[string]string{"path": t.TempDir()}},
-		{storeType: "memory"},
-		{storeType: "sqlite", config: map[string]string{"path": filepath.Join(t.TempDir(), "meta.db")}},
+		{storeType: "badger", config: map[string]any{"path": t.TempDir()}},
+		{storeType: "badger", config: map[string]any{"in_memory": true}},
 	}
 
 	for _, tt := range tests {
-		t.Run(tt.storeType, func(t *testing.T) {
+		t.Run(fmt.Sprint(tt.config), func(t *testing.T) {
 			_, handler, _ := setupMetadataStoreHealthTest(t)
 
 			if w := createMetadataStoreReq(t, handler, "dup", tt.storeType, tt.config); w.Code != http.StatusCreated {
@@ -325,8 +324,9 @@ func TestMetadataStoreHandler_Create_DuplicateNameIsConflict(t *testing.T) {
 // a collision.
 func TestMetadataStoreHandler_Create_NameSpellingAnotherStoreIDIsNotAConflict(t *testing.T) {
 	_, handler, _ := setupMetadataStoreHealthTest(t)
+	inMemory := map[string]any{"in_memory": true}
 
-	w := createMetadataStoreReq(t, handler, "first", "memory", nil)
+	w := createMetadataStoreReq(t, handler, "first", "badger", inMemory)
 	if w.Code != http.StatusCreated {
 		t.Fatalf("first create = %d, want %d, body = %s", w.Code, http.StatusCreated, w.Body.String())
 	}
@@ -335,7 +335,7 @@ func TestMetadataStoreHandler_Create_NameSpellingAnotherStoreIDIsNotAConflict(t 
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	w = createMetadataStoreReq(t, handler, first.ID, "memory", nil)
+	w = createMetadataStoreReq(t, handler, first.ID, "badger", inMemory)
 	if w.Code != http.StatusCreated {
 		t.Errorf("create named after another store's ID = %d, want %d, body = %s", w.Code, http.StatusCreated, w.Body.String())
 	}
