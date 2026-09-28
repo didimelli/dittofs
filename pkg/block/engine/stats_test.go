@@ -84,8 +84,11 @@ func TestStats_AvailableSize(t *testing.T) {
 		}
 	}
 
-	// When TotalSize <= UsedSize, AvailableSize should be 0.
-	// (Memory store has TotalSize=0 and UsedSize=0, so AvailableSize=0 is correct)
+	// When TotalSize <= UsedSize, AvailableSize should be 0. The journal
+	// derives a free-space cap at Open, so TotalSize exceeds UsedSize here and
+	// this branch is defensive — it pins the arithmetic for a store whose cap
+	// is below its footprint (a shrinking volume), which a temp-dir fixture
+	// cannot reach.
 	if stats.TotalSize <= stats.UsedSize && stats.AvailableSize != 0 {
 		t.Fatalf("expected AvailableSize==0 when TotalSize(%d) <= UsedSize(%d), got %d",
 			stats.TotalSize, stats.UsedSize, stats.AvailableSize)
