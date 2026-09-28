@@ -40,7 +40,7 @@ func windowPeer(t *testing.T, ws *windowStore, peer func()) func() {
 // hooked, plus one regular file created with mode.
 func lostUpdateFixture(t *testing.T, name string, mode uint32) (*metadata.Service, *windowStore, metadata.FileHandle) {
 	t.Helper()
-	ws := &windowStore{SQLiteMetadataStore: newSQLiteRenameStore(t)}
+	ws := &windowStore{BadgerMetadataStore: newRenameStore(t)}
 	svc, rootHandle, share := registerRenameStore(t, ws)
 	created, _, err := svc.CreateFile(rootAuth(), rootHandle, name,
 		&metadata.FileAttr{Type: metadata.FileTypeRegular, Mode: mode})

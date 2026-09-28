@@ -9,7 +9,8 @@ import (
 	"github.com/marmos91/dittofs/internal/adapter/nfs/v3/handlers"
 	handlertesting "github.com/marmos91/dittofs/internal/adapter/nfs/v3/handlers/testing"
 	"github.com/marmos91/dittofs/pkg/metadata"
-	metadatamemory "github.com/marmos91/dittofs/pkg/metadata/store/memory"
+
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -18,7 +19,7 @@ import (
 // handle-resolution branch can be exercised with an error the store would not
 // produce on its own.
 type faultOnFetchStore struct {
-	*metadatamemory.MemoryMetadataStore
+	*badger.BadgerMetadataStore
 	err error
 }
 
@@ -145,8 +146,8 @@ func TestHandleResolutionPreservesNonStaleStatus(t *testing.T) {
 	for _, tc := range cases {
 		for _, h := range handlersUnderTest {
 			t.Run(tc.name+"/"+h.name, func(t *testing.T) {
-				fx := handlertesting.NewHandlerFixtureWithStore(t, func(inner *metadatamemory.MemoryMetadataStore) metadata.Store {
-					return &faultOnFetchStore{MemoryMetadataStore: inner, err: tc.injected}
+				fx := handlertesting.NewHandlerFixtureWithStore(t, func(inner *badger.BadgerMetadataStore) metadata.Store {
+					return &faultOnFetchStore{BadgerMetadataStore: inner, err: tc.injected}
 				})
 
 				assert.EqualValues(t, tc.want, h.call(t, fx),

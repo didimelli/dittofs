@@ -18,7 +18,8 @@ import (
 	"github.com/marmos91/dittofs/pkg/controlplane/runtime"
 	"github.com/marmos91/dittofs/pkg/controlplane/store"
 	"github.com/marmos91/dittofs/pkg/health"
-	memoryMeta "github.com/marmos91/dittofs/pkg/metadata/store/memory"
+
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger/badgertest"
 )
 
 func setupMetadataStoreHealthTest(t *testing.T) (store.Store, *MetadataStoreHandler, *runtime.Runtime) {
@@ -52,13 +53,13 @@ func TestMetadataStoreHandler_HealthCheck_Loaded(t *testing.T) {
 
 	// Create store config in DB
 	cfg := &models.MetadataStoreConfig{
-		ID: uuid.New().String(), Name: "test-meta", Type: "memory",
+		ID: uuid.New().String(), Name: "test-meta", Type: "badger", Config: `{"in_memory":true}`,
 		CreatedAt: time.Now(),
 	}
 	cpStore.CreateMetadataStore(ctx, cfg)
 
 	// Register a running store in the runtime
-	metaStore := memoryMeta.NewMemoryMetadataStoreWithDefaults()
+	metaStore := badgertest.NewInMemory(t)
 	if err := rt.RegisterMetadataStore("test-meta", metaStore); err != nil {
 		t.Fatalf("Failed to register metadata store: %v", err)
 	}
@@ -145,7 +146,7 @@ func TestMetadataStoreHandler_HealthCheck_NoRuntime(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := &models.MetadataStoreConfig{
-		ID: uuid.New().String(), Name: "no-rt-meta", Type: "memory",
+		ID: uuid.New().String(), Name: "no-rt-meta", Type: "badger", Config: `{"in_memory":true}`,
 		CreatedAt: time.Now(),
 	}
 	cpStore.CreateMetadataStore(ctx, cfg)
@@ -176,11 +177,11 @@ func TestMetadataStoreHandler_Status_OK(t *testing.T) {
 	ctx := context.Background()
 
 	cfg := &models.MetadataStoreConfig{
-		ID: uuid.New().String(), Name: "m-ok", Type: "memory",
+		ID: uuid.New().String(), Name: "m-ok", Type: "badger", Config: `{"in_memory":true}`,
 		CreatedAt: time.Now(),
 	}
 	cpStore.CreateMetadataStore(ctx, cfg)
-	if err := rt.RegisterMetadataStore("m-ok", memoryMeta.NewMemoryMetadataStoreWithDefaults()); err != nil {
+	if err := rt.RegisterMetadataStore("m-ok", badgertest.NewInMemory(t)); err != nil {
 		t.Fatalf("RegisterMetadataStore: %v", err)
 	}
 
@@ -219,10 +220,10 @@ func TestMetadataStoreHandler_List_IncludesStatus(t *testing.T) {
 	ctx := context.Background()
 
 	cpStore.CreateMetadataStore(ctx, &models.MetadataStoreConfig{
-		ID: uuid.New().String(), Name: "m-list", Type: "memory",
+		ID: uuid.New().String(), Name: "m-list", Type: "badger", Config: `{"in_memory":true}`,
 		CreatedAt: time.Now(),
 	})
-	_ = rt.RegisterMetadataStore("m-list", memoryMeta.NewMemoryMetadataStoreWithDefaults())
+	_ = rt.RegisterMetadataStore("m-list", badgertest.NewInMemory(t))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/store/metadata", nil)
 	w := httptest.NewRecorder()
@@ -247,10 +248,10 @@ func TestMetadataStoreHandler_Get_IncludesStatus(t *testing.T) {
 	ctx := context.Background()
 
 	cpStore.CreateMetadataStore(ctx, &models.MetadataStoreConfig{
-		ID: uuid.New().String(), Name: "m-get", Type: "memory",
+		ID: uuid.New().String(), Name: "m-get", Type: "badger", Config: `{"in_memory":true}`,
 		CreatedAt: time.Now(),
 	})
-	_ = rt.RegisterMetadataStore("m-get", memoryMeta.NewMemoryMetadataStoreWithDefaults())
+	_ = rt.RegisterMetadataStore("m-get", badgertest.NewInMemory(t))
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/store/metadata/m-get", nil)
 	req = withMetadataStoreName(req, "m-get")

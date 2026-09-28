@@ -18,7 +18,9 @@ import (
 	"github.com/marmos91/dittofs/pkg/controlplane/runtime/shares"
 	cpstore "github.com/marmos91/dittofs/pkg/controlplane/store"
 	"github.com/marmos91/dittofs/pkg/metadata"
-	metadatamemory "github.com/marmos91/dittofs/pkg/metadata/store/memory"
+
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger/badgertest"
 )
 
 // DefaultShareName is the default share name used in test fixtures.
@@ -54,7 +56,7 @@ type HandlerTestFixture struct {
 
 	// MetaStore is the underlying memory-backed metadata store. Exposed so
 	// tests can adjust static capabilities (e.g. MaxWriteSize) directly.
-	MetaStore *metadatamemory.MemoryMetadataStore
+	MetaStore *badger.BadgerMetadataStore
 
 	// BlockStore provides block storage for content operations.
 	BlockStore *engine.Store
@@ -95,7 +97,7 @@ func NewHandlerFixture(t testing.TB) *HandlerTestFixture {
 // registers the memory store unchanged.
 func NewHandlerFixtureWithStore(
 	t testing.TB,
-	wrap func(*metadatamemory.MemoryMetadataStore) metadata.Store,
+	wrap func(*badger.BadgerMetadataStore) metadata.Store,
 ) *HandlerTestFixture {
 	t.Helper()
 
@@ -107,7 +109,7 @@ func NewHandlerFixtureWithStore(
 	ctx := context.Background()
 
 	// Create stores
-	metaStore := metadatamemory.NewMemoryMetadataStoreWithDefaults()
+	metaStore := badgertest.NewInMemory(t)
 
 	// Create local store, syncer, and block store engine
 	tmpDir := t.TempDir()

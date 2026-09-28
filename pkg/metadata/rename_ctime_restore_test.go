@@ -2,12 +2,12 @@ package metadata_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/marmos91/dittofs/pkg/metadata"
-	"github.com/marmos91/dittofs/pkg/metadata/store/sqlite"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger/badgertest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -16,33 +16,17 @@ import (
 // store holds. Both values come from inside Move's transaction, which is what
 // makes the restore safe to apply and possible to apply at all.
 
-// newSQLiteRenameFixture builds a Service over sqlite. sqlite (like postgres)
-// stores timestamps as Windows FILETIME ticks and truncates on the way in, so
-// it is the backend where a value that never went through the store cannot be
-// compared against one that did.
-func newSQLiteRenameFixture(t *testing.T) (*metadata.Service, metadata.FileHandle, string) {
+// newRenameFixture builds a Service over an in-memory Badger store.
+func newRenameFixture(t *testing.T) (*metadata.Service, metadata.FileHandle, string) {
 	t.Helper()
-	return registerRenameStore(t, newSQLiteRenameStore(t))
+	return registerRenameStore(t, newRenameStore(t))
 }
 
-// newSQLiteRenameStore builds the bare sqlite store, so a test can wrap it
-// before registering it with the Service.
-func newSQLiteRenameStore(t *testing.T) *sqlite.SQLiteMetadataStore {
+// newRenameStore builds the bare store, so a test can wrap it before
+// registering it with the Service.
+func newRenameStore(t *testing.T) *badger.BadgerMetadataStore {
 	t.Helper()
-	ctx := context.Background()
-	store, err := sqlite.NewSQLiteMetadataStore(ctx,
-		&sqlite.SQLiteMetadataStoreConfig{Path: filepath.Join(t.TempDir(), "m.db"), AutoMigrate: true},
-		metadata.FilesystemCapabilities{
-			MaxReadSize: 1048576, PreferredReadSize: 1048576,
-			MaxWriteSize: 1048576, PreferredWriteSize: 1048576,
-			MaxFileSize: 1 << 62, MaxFilenameLen: 255,
-			MaxPathLen: 4096, MaxHardLinkCount: 32767,
-			SupportsHardLinks: true, SupportsSymlinks: true,
-			CaseSensitive: true, CasePreserving: true, TimestampResolution: 1,
-		})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = store.Close() })
-	return store
+	return badgertest.NewInMemory(t)
 }
 
 // registerRenameStore creates the share root and wires the store into a Service.
@@ -70,7 +54,7 @@ func registerRenameStore(t *testing.T, store metadata.Store) (*metadata.Service,
 // trip. Comparing against the unstored value makes the restore a silent no-op —
 // green everywhere, and wrong on every SQL backend.
 func TestRenameCtimeRestore_SurvivesTruncatingBackend(t *testing.T) {
-	svc, rootHandle, share := newSQLiteRenameFixture(t)
+	svc, rootHandle, share := newRenameFixture(t)
 	root := rootAuth()
 
 	created, _, err := svc.CreateFile(root, rootHandle, "a.bin",
@@ -119,7 +103,7 @@ func TestRenameCtimeRestore_SurvivesTruncatingBackend(t *testing.T) {
 // multiple of 100 and so always round-trip intact, and only a clock reading
 // full nanoseconds shows the restore silently ceasing to fire.
 func TestRenameCtimeRestore_ComparesValuesTheStoreHolds(t *testing.T) {
-	svc, rootHandle, share := newSQLiteRenameFixture(t)
+	svc, rootHandle, share := newRenameFixture(t)
 	root := rootAuth()
 
 	created, _, err := svc.CreateFile(root, rootHandle, "e.bin",
@@ -168,7 +152,7 @@ func TestRenameCtimeRestore_ComparesValuesTheStoreHolds(t *testing.T) {
 // concurrency, and it is what keeps an advance committed just before the rename
 // from being erased.
 func TestRenameCtimeRestore_MovePopulatesBothWccTimestamps(t *testing.T) {
-	svc, rootHandle, share := newSQLiteRenameFixture(t)
+	svc, rootHandle, share := newRenameFixture(t)
 	root := rootAuth()
 
 	created, _, err := svc.CreateFile(root, rootHandle, "f.bin",

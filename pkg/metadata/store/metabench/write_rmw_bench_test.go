@@ -5,80 +5,32 @@ import (
 	"fmt"
 	"math/rand"
 	"path"
-	"path/filepath"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/marmos91/dittofs/pkg/metadata"
 	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
-	"github.com/marmos91/dittofs/pkg/metadata/store/sqlite"
 )
 
-// nFiles is shared by every cell so the scatter is identical across backends;
-// a cell that seeded a different population would not be comparable.
+// nFiles is the seeded population the writes scatter over.
 const nFiles = 20000
 
-// caps is the minimal filesystem-capability set every backend needs to open.
-func caps() metadata.FilesystemCapabilities {
-	return metadata.FilesystemCapabilities{
-		MaxReadSize: 1 << 20, PreferredReadSize: 1 << 20,
-		MaxWriteSize: 1 << 20, PreferredWriteSize: 1 << 20,
-		MaxFileSize: 1<<63 - 1, MaxFilenameLen: 255, MaxPathLen: 4096,
-		CasePreserving: true, TimestampResolution: 1,
-	}
-}
-
-// backend names a metadata store the write-path comparison drives. Durability
-// is equalized to fsync-free across these two (badger SyncWrites=false, sqlite
-// WAL+synchronous=NORMAL) so any gap that remains is access-pattern/round-trip/
-// CPU, i.e. design, not the disk's fsync cost.
+// BenchmarkWriteRMW drives the data-write metadata op — the RMW a 4k WRITE
+// triggers: GetFile then UpdateAttrs in one txn — against Badger with relaxed
+// durability (SyncWrites=false), scattered over a populated file set, and
+// reports IOPS. Profile it with:
 //
-// Postgres is deliberately absent here: it needs a running server, so its cell
-// lives in the integration-tagged twin of this file. That cell measures the
-// opposite thing on purpose — postgres at its default synchronous_commit=on,
-// where the per-commit WAL fsync IS the subject.
-type backend struct {
-	name string
-	open func(b *testing.B) metadata.Store
-}
-
-func backends() []backend {
-	return []backend{
-		{"badger", func(b *testing.B) metadata.Store {
-			s, err := badger.NewBadgerMetadataStoreWithDefaultsAndCaches(
-				context.Background(), b.TempDir(), 0, 0, true /*relaxedDurability*/)
-			if err != nil {
-				b.Fatalf("badger open: %v", err)
-			}
-			return s
-		}},
-		{"sqlite", func(b *testing.B) metadata.Store {
-			s, err := sqlite.NewSQLiteMetadataStore(context.Background(),
-				&sqlite.SQLiteMetadataStoreConfig{Path: filepath.Join(b.TempDir(), "m.db"), AutoMigrate: true},
-				caps())
-			if err != nil {
-				b.Fatalf("sqlite open: %v", err)
-			}
-			return s
-		}},
-	}
-}
-
-// BenchmarkWriteCompare drives the identical data-write metadata op — the RMW a
-// 4k WRITE triggers: GetFile (SELECT) then UpdateAttrs (row UPDATE) in one txn —
-// against each backend, scattered over a populated file set, and reports IOPS.
-// Run one backend at a time with its own profile to compare flamegraphs:
-//
-//	DITTOFS_LOGGING_LEVEL=ERROR go test -run '^$' -bench 'WriteCompare/badger' \
+//	DITTOFS_LOGGING_LEVEL=ERROR go test -run '^$' -bench WriteRMW \
 //	  -benchtime 3s -cpuprofile /tmp/badger.prof ./pkg/metadata/store/metabench/
 //	go tool pprof -top /tmp/badger.prof
-func BenchmarkWriteCompare(b *testing.B) {
-	for _, be := range backends() {
-		b.Run(be.name, func(b *testing.B) {
-			benchmarkDataWriteRMW(b, be.open(b), "/hot")
-		})
+func BenchmarkWriteRMW(b *testing.B) {
+	s, err := badger.NewBadgerMetadataStoreWithDefaultsAndCaches(
+		context.Background(), b.TempDir(), 0, 0, true /*relaxedDurability*/)
+	if err != nil {
+		b.Fatalf("badger open: %v", err)
 	}
+	benchmarkDataWriteRMW(b, s, "/hot")
 }
 
 // benchmarkDataWriteRMW seeds share with nFiles files and then drives the 4k
@@ -87,9 +39,7 @@ func BenchmarkWriteCompare(b *testing.B) {
 //
 // The seed is untimed but is NOT sized from b.N, so it does not grow with the
 // timed region; it does re-run on each invocation the framework makes while
-// growing b.N, which for a networked store costs more than the measurement.
-// Pass -benchtime=<N>x to pin the iteration count and keep that to one real
-// invocation rather than letting a duration walk b.N upward.
+// growing b.N. Pass -benchtime=<N>x to pin the iteration count.
 //
 // Concurrency is the point, not incidental: a lever that coalesces concurrent
 // commits has nothing to work with in a serial benchmark, so a cell run at

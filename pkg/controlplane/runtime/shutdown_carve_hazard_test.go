@@ -14,7 +14,7 @@ import (
 	"github.com/marmos91/dittofs/pkg/controlplane/runtime/shares"
 	cpstore "github.com/marmos91/dittofs/pkg/controlplane/store"
 	"github.com/marmos91/dittofs/pkg/metadata"
-	sqlitemeta "github.com/marmos91/dittofs/pkg/metadata/store/sqlite"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
 )
 
 // closeWatchingStore records the outcome of every transaction that reaches the
@@ -66,8 +66,8 @@ type carveHazardFixture struct {
 }
 
 // newCarveHazardFixture builds a runtime with one remote-backed share over a
-// real SQLite metadata store, the backend whose close makes a late commit fail
-// rather than quietly succeed.
+// real Badger metadata store, whose close makes a late commit fail rather than
+// quietly succeed.
 func newCarveHazardFixture(t *testing.T) *carveHazardFixture {
 	t.Helper()
 	ctx := context.Background()
@@ -86,14 +86,11 @@ func newCarveHazardFixture(t *testing.T) *carveHazardFixture {
 		t.Fatalf("CreateBlockStore: %v", err)
 	}
 
-	sq, err := sqlitemeta.NewSQLiteMetadataStore(ctx, &sqlitemeta.SQLiteMetadataStoreConfig{
-		Path:        filepath.Join(t.TempDir(), "meta.db"),
-		AutoMigrate: true,
-	}, metadata.FilesystemCapabilities{})
+	ms, err := badger.NewBadgerMetadataStoreWithDefaults(ctx, filepath.Join(t.TempDir(), "meta"))
 	if err != nil {
-		t.Fatalf("NewSQLiteMetadataStore: %v", err)
+		t.Fatalf("NewBadgerMetadataStoreWithDefaults: %v", err)
 	}
-	meta := &closeWatchingStore{Store: sq}
+	meta := &closeWatchingStore{Store: ms}
 
 	rt := New(cps)
 	rt.SetLocalStoreDefaults(&shares.LocalStoreDefaults{JournalRoot: t.TempDir()})

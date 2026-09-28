@@ -6,7 +6,9 @@ import (
 	"time"
 
 	"github.com/marmos91/dittofs/pkg/metadata"
-	"github.com/marmos91/dittofs/pkg/metadata/store/memory"
+
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger/badgertest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,7 +21,7 @@ import (
 type testFixture struct {
 	t          *testing.T
 	service    *metadata.Service
-	store      *memory.MemoryMetadataStore
+	store      *badger.BadgerMetadataStore
 	shareName  string
 	rootHandle metadata.FileHandle
 }
@@ -27,7 +29,7 @@ type testFixture struct {
 func newTestFixture(t *testing.T) *testFixture {
 	t.Helper()
 
-	store := memory.NewMemoryMetadataStoreWithDefaults()
+	store := badgertest.NewInMemory(t)
 	ctx := context.Background()
 	shareName := "/test"
 
@@ -102,7 +104,7 @@ func TestMetadataService_RegisterStoreForShare(t *testing.T) {
 	t.Run("registers store successfully", func(t *testing.T) {
 		t.Parallel()
 		svc := metadata.New()
-		store := memory.NewMemoryMetadataStoreWithDefaults()
+		store := badgertest.NewInMemory(t)
 
 		err := svc.RegisterStoreForShare("/test", store)
 
@@ -122,7 +124,7 @@ func TestMetadataService_RegisterStoreForShare(t *testing.T) {
 	t.Run("rejects empty share name", func(t *testing.T) {
 		t.Parallel()
 		svc := metadata.New()
-		store := memory.NewMemoryMetadataStoreWithDefaults()
+		store := badgertest.NewInMemory(t)
 
 		err := svc.RegisterStoreForShare("", store)
 
@@ -137,7 +139,7 @@ func TestMetadataService_GetStoreForShare(t *testing.T) {
 	t.Run("returns registered store", func(t *testing.T) {
 		t.Parallel()
 		svc := metadata.New()
-		store := memory.NewMemoryMetadataStoreWithDefaults()
+		store := badgertest.NewInMemory(t)
 		_ = svc.RegisterStoreForShare("/test", store)
 
 		got, err := svc.GetStoreForShare("/test")

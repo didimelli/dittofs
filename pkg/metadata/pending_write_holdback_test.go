@@ -2,12 +2,11 @@ package metadata_test
 
 import (
 	"context"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/marmos91/dittofs/pkg/metadata"
-	"github.com/marmos91/dittofs/pkg/metadata/store/sqlite"
+	"github.com/marmos91/dittofs/pkg/metadata/store/badger/badgertest"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,18 +17,7 @@ import (
 func newHoldbackFixture(t *testing.T) (*metadata.Service, metadata.Store, metadata.FileHandle, *metadata.AuthContext) {
 	t.Helper()
 	ctx := context.Background()
-	store, err := sqlite.NewSQLiteMetadataStore(ctx,
-		&sqlite.SQLiteMetadataStoreConfig{Path: filepath.Join(t.TempDir(), "m.db"), AutoMigrate: true},
-		metadata.FilesystemCapabilities{
-			MaxReadSize: 1048576, PreferredReadSize: 1048576,
-			MaxWriteSize: 1048576, PreferredWriteSize: 1048576,
-			MaxFileSize: 1 << 62, MaxFilenameLen: 255,
-			MaxPathLen: 4096, MaxHardLinkCount: 32767,
-			SupportsHardLinks: true, SupportsSymlinks: true,
-			CaseSensitive: true, CasePreserving: true, TimestampResolution: 1,
-		})
-	require.NoError(t, err)
-	t.Cleanup(func() { _ = store.Close() })
+	store := badgertest.NewInMemory(t)
 
 	const share = "/holdback"
 	root, err := store.CreateRootDirectory(ctx, share,
