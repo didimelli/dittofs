@@ -2,17 +2,18 @@ package journal
 
 import "context"
 
-// LocalStore mirrors *Store's host-side admin surface as an interface, so a
-// caller that only needs the per-share local byte cache can be handed a
-// wrapper — a test double gating one method, say — in place of the store
-// itself. The assertion below is the drift check: the interface is written by
+// LocalStore mirrors *Store's host-side admin surface as an interface. The
+// engine and syncer hold the local tier through it, but every production
+// assignment is the concrete *Store; its one real use is letting a test
+// substitute a decorator that overrides a single method and delegates the
+// rest. The assertion below is the drift check: the interface is written by
 // hand, so a renamed or re-signed method on Store fails the build here rather
 // than at whichever consumer reached for it.
 var _ LocalStore = (*Store)(nil)
 
-// LocalStore is the per-share local byte cache. All production consumers hold
-// the whole interface, so it is deliberately one wide interface rather than
-// composable slices — see the ponytail note below.
+// LocalStore is the per-share local byte cache. Every caller that needs more
+// than the seam above holds the whole store, so it is deliberately one wide
+// interface rather than composable slices — see the ponytail note below.
 //
 // The carve seam is journal's Flush: callers enumerate journal ListFiles per
 // file id (the empty id is not special) and pass a reading fn plus an AfterFile
@@ -22,9 +23,10 @@ var _ LocalStore = (*Store)(nil)
 // bytes back into the local tier.
 //
 // ponytail: one wide interface rather than composable slices, sectioned by the
-// comments below. Every production consumer holds the whole store, so splitting
-// it would add named unions without narrowing a single dependency; split when a
-// consumer genuinely needs only one section.
+// comments below. The decorators that justify it embed the interface and
+// override one method, so a split would force each to re-embed every slice;
+// split only if a consumer arrives that needs one section and cannot hold the
+// rest.
 type LocalStore interface {
 	// --- Data plane (FileID + offset keyed) ---
 

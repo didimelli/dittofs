@@ -547,8 +547,8 @@ error. Callers must not tight-loop retry on it — surface it and let the client
 re-drive on its own schedule.
 
 What changed is what the COMMIT seam does with that soft result when the local
-tier is **volatile** (a journal explicitly marked `{"durable": false}`, or the
-in-memory store used by tests) and the share asks for `commit_ack: block-store`.
+tier is **volatile** (a journal explicitly marked `{"durable": false}`) and the
+share asks for `commit_ack: block-store`.
 It used to acknowledge anyway; it now returns a hard error (`ErrNotDurableYet`,
 normalized to the I/O-class wire code). That is deliberate and more honest: with a
 volatile local tier and an unreachable block store, nothing holding the bytes
@@ -569,7 +569,7 @@ The journal-native `LocalStore` surface is `(FileID, offset)`-keyed, so the one
 `blockstoretest` suite (`RemoteBlockStoreConformance`) does **not** apply to it — that
 suite targets the block-keyed `remote.RemoteBlockStore` surface (see
 [Implementing a Remote Block Store](#implementing-a-remote-block-store-block-keyed)).
-The journal and the in-memory local store are exercised by their own package tests under
+The journal is exercised by its own package tests under
 `pkg/block/journal/`.
 
 ## Implementing a Remote Store

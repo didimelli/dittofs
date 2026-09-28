@@ -7,8 +7,7 @@
 //     (non-CAS) contract suite. The memory and s3 backends both call it.
 //
 // There is no hash-keyed entrypoint. The CAS block.Store interface and its
-// BlockStoreConformance suite were deleted; only orphan godoc for the
-// interface survives in pkg/block/blockstore.go.
+// BlockStoreConformance suite were deleted.
 //
 // There is no append-log entrypoint either. The local tier (*journal.Store)
 // is payload-keyed — it exposes journal.LocalStore (WriteAt / ReadAt / Hydrate

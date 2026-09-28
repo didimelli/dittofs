@@ -1596,8 +1596,8 @@ Two consequences worth knowing:
 The offline `.blk`->CAS tool (`migrate-to-cas`) shipped through v0.21 and has
 been removed. The journal format stamp (`cmd/dfs/commands/start.go`'s
 `handleFormatMismatch`) refuses a directory a newer release wrote and exits 78
-(`EX_CONFIG`); the pre-journal blobs/+logs/ guard was deleted with
-`pkg/block/local/fs` — no production stores exist in field, so opening such a
+(`EX_CONFIG`); the pre-journal blobs/+logs/ guard was deleted with the
+pre-journal local tier — no production stores exist in field, so opening such a
 directory as an empty journal is accepted. Unlike the standalone-CAS case
 above, this one is a read-time answer, not a boot refusal.
 
