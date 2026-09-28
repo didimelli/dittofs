@@ -41,13 +41,16 @@ func TestCopyChunk_SparseDest_LeadingGapReadsZeros(t *testing.T) {
 		t.Fatalf("cpstore.New: %v", err)
 	}
 
+	// Opened before the runtime so cleanup closes it after the runtime has
+	// removed its shares: a background fetch still reading the store would
+	// otherwise hit a closed database.
+	metaStore := badgertest.NewInMemory(t)
 	rt := newTestRuntime(t, cps)
 
 	// Register a memory metadata store.
 	if _, err := cps.CreateMetadataStore(ctx, &models.MetadataStoreConfig{Name: "ccmeta", Type: "badger", Config: `{"in_memory":true}`}); err != nil {
 		t.Fatalf("CreateMetadataStore: %v", err)
 	}
-	metaStore := badgertest.NewInMemory(t)
 	if err := rt.RegisterMetadataStore("ccmeta", metaStore); err != nil {
 		t.Fatalf("RegisterMetadataStore: %v", err)
 	}
@@ -266,12 +269,15 @@ func TestCopyChunk_SparseDest_SurvivesPriorPayloadReuse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("cpstore.New: %v", err)
 	}
+	// Opened before the runtime so cleanup closes it after the runtime has
+	// removed its shares: a background fetch still reading the store would
+	// otherwise hit a closed database.
+	metaStore := badgertest.NewInMemory(t)
 	rt := newTestRuntime(t, cps)
 
 	if _, err := cps.CreateMetadataStore(ctx, &models.MetadataStoreConfig{Name: "ccmeta", Type: "badger", Config: `{"in_memory":true}`}); err != nil {
 		t.Fatalf("CreateMetadataStore: %v", err)
 	}
-	metaStore := badgertest.NewInMemory(t)
 	if err := rt.RegisterMetadataStore("ccmeta", metaStore); err != nil {
 		t.Fatalf("RegisterMetadataStore: %v", err)
 	}

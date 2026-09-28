@@ -768,8 +768,8 @@ func (s *BadgerMetadataStore) GetQuotaUsage(shareName string, scope metadata.Quo
 // NewBadgerMetadataStoreWithDefaults creates a new BadgerDB metadata store with sensible defaults.
 //
 // This is a convenience constructor that sets up the store with standard capabilities
-// and limits suitable for most use cases. See NewMemoryMetadataStoreWithDefaults in
-// memory/store.go for the specific default values.
+// and limits suitable for most use cases (basestore.DefaultCapabilities, no size
+// or file-count limit).
 //
 // Parameters:
 //   - ctx: Context for cancellation and timeouts

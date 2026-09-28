@@ -3,12 +3,13 @@ package runtime
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"path/filepath"
-	"strings"
 	"sync"
 	"testing"
 	"time"
 
+	dgbadger "github.com/dgraph-io/badger/v4"
 	adaptercommon "github.com/marmos91/dittofs/internal/adapter/common"
 	"github.com/marmos91/dittofs/pkg/controlplane/models"
 	"github.com/marmos91/dittofs/pkg/controlplane/runtime/shares"
@@ -214,7 +215,7 @@ func TestCarveCommitsReachAClosedMetadataStore_WithoutTheFence(t *testing.T) {
 	// showing none of the harm: the point is that the commit fails and the
 	// chunk it was carving stays local and unmirrored.
 	for i, e := range errs {
-		if e == nil || !strings.Contains(e.Error(), "database is closed") {
+		if !errors.Is(e, dgbadger.ErrDBClosed) {
 			t.Errorf("late transaction [%d] = %v, want a closed-database failure", i, e)
 		}
 	}

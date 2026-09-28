@@ -15,15 +15,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// faultOnFetchStore fails every GetFile with a fixed error, so a handler's
-// handle-resolution branch can be exercised with an error the store would not
-// produce on its own.
+// faultOnFetchStore fails every inode fetch — GetFile and Badger's
+// GetFileForRead / GetFileForCreate fast paths — with a fixed error, so a
+// handler's handle-resolution branch can be exercised with an error the store
+// would not produce on its own.
 type faultOnFetchStore struct {
 	*badger.BadgerMetadataStore
 	err error
 }
 
 func (s *faultOnFetchStore) GetFile(_ context.Context, _ metadata.FileHandle) (*metadata.File, error) {
+	return nil, s.err
+}
+
+func (s *faultOnFetchStore) GetFileForRead(_ context.Context, _ metadata.FileHandle) (*metadata.File, error) {
+	return nil, s.err
+}
+
+func (s *faultOnFetchStore) GetFileForCreate(_ context.Context, _ metadata.FileHandle) (*metadata.File, error) {
 	return nil, s.err
 }
 

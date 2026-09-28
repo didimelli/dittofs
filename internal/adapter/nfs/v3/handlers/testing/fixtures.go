@@ -1,6 +1,6 @@
 // Package testing provides test fixtures for NFS v3 handler behavioral tests.
 //
-// This package uses real memory stores (not mocks) to test handlers against
+// This package uses real in-memory Badger stores (not mocks) to test handlers against
 // RFC 1813 behavioral requirements without testing implementation details.
 package testing
 
@@ -35,7 +35,7 @@ const DefaultGID = uint32(1000)
 // HandlerTestFixture provides a complete test environment for NFS v3 handlers.
 //
 // It sets up:
-//   - A real memory metadata store (owned by MetadataService)
+//   - A real in-memory Badger metadata store (owned by MetadataService)
 //   - A BlockStore for content operations
 //   - A registry with a configured share
 //   - A Handler instance ready for testing
@@ -51,10 +51,10 @@ type HandlerTestFixture struct {
 	Registry *runtime.Runtime
 
 	// MetadataService provides high-level metadata operations.
-	// It owns the memory-backed metadata store.
+	// It owns the in-memory Badger metadata store.
 	MetadataService *metadata.Service
 
-	// MetaStore is the underlying memory-backed metadata store. Exposed so
+	// MetaStore is the underlying in-memory Badger metadata store. Exposed so
 	// tests can adjust static capabilities (e.g. MaxWriteSize) directly.
 	MetaStore *badger.BadgerMetadataStore
 
@@ -76,7 +76,7 @@ type HandlerTestFixture struct {
 // NewHandlerFixture creates a new test fixture with default configuration.
 //
 // The fixture includes:
-//   - Memory metadata store with default capabilities
+//   - In-memory Badger metadata store with default capabilities
 //   - BlockStore for content operations
 //   - A share named "/export"
 //   - Handler with the registry configured
@@ -88,13 +88,13 @@ func NewHandlerFixture(t testing.TB) *HandlerTestFixture {
 }
 
 // NewHandlerFixtureWithStore is like NewHandlerFixture but lets a test wrap the
-// underlying memory metadata store before it is registered with the runtime.
+// underlying in-memory Badger metadata store before it is registered with the runtime.
 //
-// The wrap function receives the concrete memory store (already wired to the
+// The wrap function receives the concrete Badger store (already wired to the
 // block store / syncer) and returns the metadata.Store to register. This lets a
 // test inject fault behaviour (e.g. a GetFile that returns nil) to exercise
-// handler error paths that the plain memory store cannot reach. A nil wrap
-// registers the memory store unchanged.
+// handler error paths that the plain store cannot reach. A nil wrap
+// registers the store unchanged.
 func NewHandlerFixtureWithStore(
 	t testing.TB,
 	wrap func(*badger.BadgerMetadataStore) metadata.Store,

@@ -12,14 +12,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// countingStore wraps the memory store and counts GetFile calls, keyed by the
-// requested handle. It embeds *badger.BadgerMetadataStore so it satisfies the
-// full metadata.Store interface while overriding only GetFile — the Service
-// holds it via the Store interface (RegisterStoreForShare), so the override is
-// actually dispatched. Note: it observes store.GetFile only; parent reads that
-// went through tx.GetFile inside a transaction would not be counted here. The
-// create path deliberately does not read the parent inode inside its
-// transaction (#1573), so every parent read is a store.GetFile and is caught.
+// countingStore wraps a Badger store and counts parent-inode reads, keyed by
+// the requested handle. It embeds *badger.BadgerMetadataStore so it satisfies
+// the full metadata.Store interface while overriding only the two reads the
+// create path can take for the parent — GetFileForCreate when the store offers
+// the create cache (Badger does), GetFile otherwise. The Service holds it via
+// the Store interface (RegisterStoreForShare), so the overrides are actually
+// dispatched. Reads through tx.GetFile inside a transaction are not counted;
+// the create path deliberately does not read the parent inode inside its
+// transaction (#1573).
 type countingStore struct {
 	*badger.BadgerMetadataStore
 	total  atomic.Int64
@@ -30,6 +31,12 @@ func (c *countingStore) GetFile(ctx context.Context, h metadata.FileHandle) (*me
 	c.total.Add(1)
 	c.perKey[string(h)]++
 	return c.BadgerMetadataStore.GetFile(ctx, h)
+}
+
+func (c *countingStore) GetFileForCreate(ctx context.Context, h metadata.FileHandle) (*metadata.File, error) {
+	c.total.Add(1)
+	c.perKey[string(h)]++
+	return c.BadgerMetadataStore.GetFileForCreate(ctx, h)
 }
 
 // TestCreateFile_ParentGetFileDedup pins the parent-inode read dedup (#1737):

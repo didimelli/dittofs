@@ -1596,24 +1596,24 @@ func TestMetadataService_CommitWrite(t *testing.T) {
 		// Second write — mtime must be identical (frozen)
 		intent2, err := fx.service.PrepareWrite(fx.rootContext(), handle, 2048)
 		require.NoError(t, err)
-		assert.Equal(t, frozenMtime, intent2.NewMtime, "PrepareWrite should reuse frozen mtime")
+		assert.True(t, frozenMtime.Equal(intent2.NewMtime), "PrepareWrite should reuse frozen mtime")
 
 		file2, err := fx.service.CommitWrite(fx.rootContext(), intent2)
 		require.NoError(t, err)
-		assert.Equal(t, frozenMtime, file2.Mtime, "CommitWrite should return frozen mtime")
+		assert.True(t, frozenMtime.Equal(file2.Mtime), "CommitWrite should return frozen mtime")
 
 		// Third write — still frozen
 		intent3, err := fx.service.PrepareWrite(fx.rootContext(), handle, 4096)
 		require.NoError(t, err)
 		file3, err := fx.service.CommitWrite(fx.rootContext(), intent3)
 		require.NoError(t, err)
-		assert.Equal(t, frozenMtime, file3.Mtime, "mtime must stay frozen across all writes in session")
+		assert.True(t, frozenMtime.Equal(file3.Mtime), "mtime must stay frozen across all writes in session")
 
 		// GetFile should also return the frozen mtime (pending writes merge)
 		fileGet, err := fx.service.GetFile(context.Background(), handle)
 		require.NoError(t, err)
-		assert.Equal(t, frozenMtime, fileGet.Mtime, "GetFile must return frozen mtime")
-		assert.Equal(t, frozenMtime, fileGet.Ctime, "GetFile ctime must match frozen mtime")
+		assert.True(t, frozenMtime.Equal(fileGet.Mtime), "GetFile must return frozen mtime")
+		assert.True(t, frozenMtime.Equal(fileGet.Ctime), "GetFile ctime must match frozen mtime")
 
 		// Flush pending writes (simulates COMMIT — relaxed durability post-#1687)
 		flushed, err := fx.service.FlushPendingWriteForFile(fx.rootContext(), handle, false)
@@ -1623,8 +1623,8 @@ func TestMetadataService_CommitWrite(t *testing.T) {
 		// After flush, GetFile reads from store — mtime must still match
 		filePostFlush, err := fx.service.GetFile(context.Background(), handle)
 		require.NoError(t, err)
-		assert.Equal(t, frozenMtime, filePostFlush.Mtime, "mtime must survive flush to store")
-		assert.Equal(t, frozenMtime, filePostFlush.Ctime, "ctime must survive flush to store")
+		assert.True(t, frozenMtime.Equal(filePostFlush.Mtime), "mtime must survive flush to store")
+		assert.True(t, frozenMtime.Equal(filePostFlush.Ctime), "ctime must survive flush to store")
 		assert.Equal(t, uint64(4096), filePostFlush.Size, "size must reflect max of all writes")
 	})
 }
@@ -1632,11 +1632,10 @@ func TestMetadataService_CommitWrite(t *testing.T) {
 func TestMetadataService_GetFileForRead(t *testing.T) {
 	t.Parallel()
 
-	// The memory store does not implement the fileForReadStore fast-path
-	// interface, so this exercises GetFileForRead's fallback branch: it must
-	// route to store.GetFile and return the same file (both then apply the
-	// identical mergePendingWrites overlay). A missing store handle must error,
-	// not panic.
+	// Badger implements the fileForReadStore fast path, which skips the
+	// Path derivation but must otherwise return the same file as GetFile (both
+	// then apply the identical mergePendingWrites overlay). A missing store
+	// handle must error, not panic.
 	fx := newTestFixture(t)
 
 	_, _, err := fx.service.CreateFile(fx.rootContext(), fx.rootHandle, "r.txt", &metadata.FileAttr{Mode: 0644})
@@ -1654,9 +1653,9 @@ func TestMetadataService_GetFileForRead(t *testing.T) {
 	assert.Equal(t, viaGet.ShareName, viaRead.ShareName)
 	assert.Equal(t, viaGet.Mode, viaRead.Mode)
 	assert.Equal(t, viaGet.Size, viaRead.Size)
-	assert.Equal(t, viaGet.Path, viaRead.Path, "fallback path derives Path exactly like GetFile")
+	assert.Equal(t, viaGet.ID, viaRead.ID)
 
-	// Unknown handle surfaces the store error through the fallback path.
+	// Unknown handle surfaces the store error.
 	_, err = fx.service.GetFileForRead(context.Background(), metadata.FileHandle("bogus"))
 	require.Error(t, err)
 }

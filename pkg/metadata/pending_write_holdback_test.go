@@ -75,8 +75,8 @@ func TestHeldBackSizeDoesNotFreezeTheWriteTime(t *testing.T) {
 
 	f, err := store.GetFile(ctx.Context, handle)
 	require.NoError(t, err)
-	// Compared against the first write rather than the second: a backend stores
-	// time at its own granularity (sqlite truncates to 100ns), so a not-before
+	// Compared against the first write rather than the second: a backend may store
+	// time at a coarser granularity, so a not-before
 	// test against a nanosecond-precise instant fails on a stored value that is
 	// merely rounded down. The sleep above is orders of magnitude larger than
 	// any such rounding, so "moved past the first write" still separates a
