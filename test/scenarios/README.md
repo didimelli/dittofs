@@ -97,9 +97,9 @@ uses your normal podman storage, so `podman images` lists the three images it pu
 caches, downloads (apt packages, the libnfs source), inputs and kept logs are in the cache,
 `/var/tmp/dittofs-scenarios`.
 
-The host can be a container, for example on macOS, where Docker runs in a Linux VM, or on a Linux
-host whose podman is older than 5.6: run `setup.sh` in `quay.io/podman/stable`, as its user `podman`.
-Run this from the checkout's root, which it mounts as `$PWD`:
+On a laptop where Docker runs in a Linux VM (Docker Desktop, Colima), as on macOS, the host can be a
+container: run `setup.sh` in `quay.io/podman/stable`, as its user `podman`. Run this from the
+checkout's root, which it mounts as `$PWD`:
 
 ```bash
 docker run --rm -it --privileged -e CONTAINERS_CONF=/etc/containers/containers.conf \
@@ -109,7 +109,9 @@ docker run --rm -it --privileged -e CONTAINERS_CONF=/etc/containers/containers.c
   quay.io/podman/stable ./setup.sh 00-smb-nfs-roundtrip-gc-xs.sh
 ```
 
-- `--privileged` lets the podman inside make user namespaces, mounts and its network.
+- `--privileged` lets the podman inside make user namespaces, mounts and its network. It gives up
+  what running rootless on the host keeps, so it belongs only inside such a VM, never on a shared
+  host; a server runs `setup.sh` on its own rootless podman.
 - `CONTAINERS_CONF` loads only the image's system config. The image also has one for `podman` that
   mounts the outer `/proc` into every container, so a scenario sees the outer container's processes
   and `pkill` signals PIDs that are not its own: `s3 pause` and `s3 stop` fail.
@@ -119,6 +121,8 @@ docker run --rm -it --privileged -e CONTAINERS_CONF=/etc/containers/containers.c
 - A glob such as `[0-8]?-*.sh` must expand inside the container: `bash -c './setup.sh [0-8]?-*.sh'`.
 - To follow a run from another terminal: `docker exec -it $(docker ps -q --filter
   ancestor=quay.io/podman/stable) tail -F /var/tmp/dittofs-scenarios/run/run.log`.
+- Times there are not comparable with a host's: two container layers and a VM slow builds and I/O,
+  and Apple silicon runs arm64. They stay in the volume's own `times/`, apart from any host's.
 
 Times (`lib/report.sh`): every run adds its times to `times/<scenario>.tsv` in the cache, which
 its first run creates: one row for the scenario and one for each of its lines that ran, with the
